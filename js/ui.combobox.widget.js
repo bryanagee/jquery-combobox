@@ -1,7 +1,9 @@
 /*
- * jQuery UI Combobox Widget with Categories
+ * jQuery UI Autocomplete Combobox Widget with Categories
  * 
- * A hybrid of two demo widgets from the autocomplete demo page:
+ * Creates an autocomplete combobox with categories from a select with optgroups.
+ * 
+ * A totally re-worked hybrid of two demo widgets from the autocomplete page:
  * http://jqueryui.com/demos/autocomplete/
  * 
  * The first demo is "Combobox" and the second is "Categories"
@@ -20,6 +22,7 @@
  *	}
  *
  * @author: John Kupko
+ * @company: Pamiris Inc.
  * This software is licensed with the FreeBSD license: 
  
 Copyright 2012 Pamiris Inc. All rights reserved
@@ -49,136 +52,151 @@ of the authors and should not be interpreted as representing official policies,
 either expressed or implied, of Pamiris Inc.
 
  */
+
+//helper widget to safely override the render functions
+$.widget( "custom.catcomplete", $.ui.autocomplete, {
+		_renderItem: function(ul, item) {
+            return $( "<li></li>" )
+                .data( "item.autocomplete", item )
+                .append( "<a>" + item.label + "</a>" )
+                .appendTo( ul ); 
+        },
+        _renderMenu: function( ul, items ) {
+            var that = this;
+			var currentCategory = "";
+            $.each( items, function( index, item ) {
+                if ($(item.option).parent("optgroup").length > 0) {
+                    $(item).attr("category", $(item.option)
+                        .parent("optgroup")
+                        .attr("label"));
+                } else {
+                    $(item).attr("category", "");
+                }
+                if ( item.category != currentCategory ) {
+                    ul.append( "<li class='ui-autocomplete-category'>"
+                        + item.category
+                        + "</li>" );
+                    currentCategory = item.category;
+                }
+                that._renderItem( ul, item );
+            });
+        }    
+	});
+
 (function( $ ) {
-		$.widget( "ui.combobox", {
-			options: {
-				defaultMessage: null
-			},
-			
-			_create: function() {
-				var self = this,
-					select = this.element.hide(),
-					selected = $( ":selected", select ),
-					value = selected.val() ? selected.text() : "";
-				if (this.options.defaultMessage) { value = this.options.defaultMessage;}
-				var input = this.input = $( "<input>" )
-					.insertAfter( select )
-					.val( value )
-					.autocomplete({
-						delay: 0,
-						minLength: 0,
-						source: function( request, response ) {
-							var matcher = new RegExp( $.ui.autocomplete.escapeRegex(request.term), "i" );
-							response( $("option", select ).map(function() {
-								var text = $( this ).text();
-								if ( this.value && ( !request.term || matcher.test(text) ) )
-									return {
-										label: text.replace(
-											new RegExp(
-												"(?![^&;]+;)(?!<[^<>]*)(" +
-												$.ui.autocomplete.escapeRegex(request.term) +
-												")(?![^<>]*>)(?![^&;]+;)", "gi"
-											), "<strong>$1</strong>" ),
-										value: text,
-										option: this
-									};
-							}) );
-						},
-						select: function( event, ui ) {
-							ui.item.option.selected = true;
-							self._trigger( "selected", event, {
-								item: ui.item.option
-							});
-						},
-						change: function( event, ui ) {
-							if ( !ui.item ) {
-								var matcher = new RegExp( "^" + $.ui.autocomplete.escapeRegex( $(this).val() ) + "$", "i" ),
-									valid = false;
-								$("option", select).each(function() {
-									if ( $( this ).text().match( matcher ) ) {
-										this.selected = valid = true;
-										return false;
-									}
-								});
-								if ( !valid ) {
-									// remove invalid value, as it didn't match anything
-									$( this ).val( "" );
-									select.val( "" );
-									input.data( "autocomplete" ).term = "";
-									if (self.options.defaultMessage) {
-										$(input).val( self.options.defaultMessage );
-									}
-									return false;
-								}
-							}
-						}
-					})
-					.addClass( "ui-widget ui-widget-content ui-corner-left" );
-				
-				input.click(function() {
-					if (self.options.defaultMessage 
-						&& $(this).val() == self.options.defaultMessage) {
-						$(this).val( "" );
-					}
-				});
+    $.widget( "ui.combobox", {
+    
+        input : null,
+        options: {
+            defaultMessage: null
+        },
 
-				input.data( "autocomplete" )._renderItem = function( ul, item ) {
-					return $( "<li></li>" )
-						.data( "item.autocomplete", item )
-						.append( "<a>" + item.label + "</a>" )
-						.appendTo( ul );
-				};
-				
-				input.data( "autocomplete" )._renderMenu = function( ul, items ) {
-					var self = this,
-					currentCategory = "";
-					$.each( items, function( index, item ) {
-						if ($(item.option).parent("optgroup").length > 0) {
-							$(item).attr("category", $(item.option).parent("optgroup").attr("label"));
-						} else {
-							$(item).attr("category", "");
-						}
-						if ( item.category != currentCategory ) {
-							ul.append( "<li class='ui-autocomplete-category'>" + item.category + "</li>" );
-							currentCategory = item.category;
-						}
-						self._renderItem( ul, item );
-					});
-				}
+        _create: function() {
+            var self = this,
+            select = this.element.hide(),
+            selected = $( ":selected", select ),
+            value = selected.val() ? selected.text() : "";
+            if (this.options.defaultMessage) {value = this.options.defaultMessage;}
+            var input = this.input = $( "<input>" );
+            input.insertAfter( select ).val( value );
+            
+            input.catcomplete({
+                    delay: 0,
+                    minLength: 0,
+                    source: function( request, response ) {
+                        var matcher = new RegExp( 
+                            $.ui.autocomplete.escapeRegex(request.term), "i"
+                        );
+                        response( $("option", select ).map(function() {
+                            var text = $( this ).text();
+                            if ( this.value 
+                                && ( !request.term || matcher.test(text) ) )
+                            return {
+                                label: text.replace(
+                                    new RegExp(
+                                        "(?![^&;]+;)(?!<[^<>]*)(" +
+                                        $.ui.autocomplete.escapeRegex(request.term) +
+                                        ")(?![^<>]*>)(?![^&;]+;)", "gi"
+                                    ), "<strong>$1</strong>" ),
+                                value: text,
+                                option: this
+                            };
+                        }) );
+                    },
+                    select: function( event, ui ) {
+                        ui.item.option.selected = true;
+                        self._trigger( "selected", event, {
+                            item: ui.item.option
+                        });
+                    },
+                    change: function( event, ui ) {
+                        if ( !ui.item ) {
+                            var matcher = new RegExp( 
+                                "^" + $.ui.autocomplete.escapeRegex( 
+                                    $(this).val() ) + "$", "i" 
+                            ),
+                            valid = false;
+                            $("option", select).each(function() {
+                                if ( $( this ).text().match( matcher ) ) {
+                                    this.selected = valid = true;
+                                    return false;
+                                }
+                            });
+                            if ( !valid ) {
+                                // remove invalid value, as it didn't match anything
+                                $( this ).val( "" );
+                                select.val( "" );
+                                input.data( "catcomplete" ).term = "";
+                                if (self.options.defaultMessage) {
+                                    $(input).val( self.options.defaultMessage );
+                                }
+                                return false;
+                            }
+                        }
+                    }
+                });
+            input.addClass( "ui-widget ui-widget-content ui-corner-left" );            
 
-				this.button = $( "<button type='button'>&nbsp;</button>" )
-					.attr( "tabIndex", -1 )
-					.attr( "title", "Show All Items" )
-					.insertAfter( input )
-					.button({
-						icons: {
-							primary: "ui-icon-triangle-1-s"
-						},
-						text: false
-					})
-					.removeClass( "ui-corner-all" )
-					.addClass( "ui-corner-right ui-button-icon" )
-					.click(function() {
-						// close if already visible
-						if ( input.autocomplete( "widget" ).is( ":visible" ) ) {
-							input.autocomplete( "close" );
-							return;
-						}
+            input.click(function() {
+                if (self.options.defaultMessage 
+                    && $(this).val() == self.options.defaultMessage) {
+                    $(this).val( "" );
+                }
+            });
 
-						// work around a bug (likely same cause as #5265)
-						$( this ).blur();
+            this.button = $( "<button type='button'>&nbsp;</button>" )
+                .attr( "tabIndex", -1 )
+                .attr( "title", "Show All Items" )
+                .insertAfter( input )
+                .button({
+                    icons: {
+                        primary: "ui-icon-triangle-1-s"
+                    },
+                    text: false
+                })
+                .removeClass( "ui-corner-all" )
+                .addClass( "ui-corner-right ui-button-icon" )
+                .click(function() {
+                    // close if already visible
+                    if ( input.catcomplete( "widget" ).is( ":visible" ) ) {
+                        input.catcomplete( "close" );
+                        return;
+                    }
 
-						// pass empty string as value to search for, displaying all results
-						input.autocomplete( "search", "" );
-						input.focus();
-					});
-			},
+                    // work around a bug (likely same cause as #5265)
+                    $( this ).blur();
 
-			destroy: function() {
-				this.input.remove();
-				this.button.remove();
-				this.element.show();
-				$.Widget.prototype.destroy.call( this );
-			}
-		});
-	})( jQuery );
+                    // pass empty string as value to search for, displaying all results
+                    input.catcomplete( "search", "" );
+                    input.focus();
+                });
+        },
+
+        destroy: function() {
+            this.input.remove();
+            this.button.remove();
+            this.element.show();
+            $.Widget.prototype.destroy.call( this );
+        }
+    });
+})( jQuery );
