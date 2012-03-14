@@ -88,11 +88,12 @@ $.widget( "custom.catcomplete", $.ui.autocomplete, {
     
         input : null,
         options: {
-            defaultMessage: null
+            defaultMessage: null,
+            change: null
         },
 
         _create: function() {
-            var self = this,
+            var that = this,
             select = this.element.hide(),
             selected = $( ":selected", select ),
             value = selected.val() ? selected.text() : "";
@@ -109,25 +110,28 @@ $.widget( "custom.catcomplete", $.ui.autocomplete, {
                         );
                         response( $("option", select ).map(function() {
                             var text = $( this ).text();
-                            if ( this.value 
-                                && ( !request.term || matcher.test(text) ) )
-                            return {
-                                label: text.replace(
-                                    new RegExp(
-                                        "(?![^&;]+;)(?!<[^<>]*)(" +
-                                        $.ui.autocomplete.escapeRegex(request.term) +
-                                        ")(?![^<>]*>)(?![^&;]+;)", "gi"
-                                    ), "<strong>$1</strong>" ),
-                                value: text,
-                                option: this
+                            if ('undefined' != typeof this.value 
+                                && ( !request.term || matcher.test(text) ) ) {
+                                return {
+                                    label: text.replace(
+                                        new RegExp(
+                                            "(?![^&;]+;)(?!<[^<>]*)(" +
+                                            $.ui.autocomplete.escapeRegex(request.term) +
+                                            ")(?![^<>]*>)(?![^&;]+;)", "gi"
+                                        ), "<strong>$1</strong>" ),
+                                    value: text,
+                                    option: this
                             };
+                            }
                         }) );
                     },
                     select: function( event, ui ) {
                         ui.item.option.selected = true;
-                        self._trigger( "selected", event, {
+                        that._trigger( "selected", event, {
                             item: ui.item.option
                         });
+                        that._trigger("change");
+                        $(input).trigger("blur");
                     },
                     change: function( event, ui ) {
                         if ( !ui.item ) {
@@ -139,6 +143,8 @@ $.widget( "custom.catcomplete", $.ui.autocomplete, {
                             $("option", select).each(function() {
                                 if ( $( this ).text().match( matcher ) ) {
                                     this.selected = valid = true;
+                                    //still don't know if it is an actual change...
+                                    that._trigger("change");
                                     return false;
                                 }
                             });
@@ -147,19 +153,19 @@ $.widget( "custom.catcomplete", $.ui.autocomplete, {
                                 $( this ).val( "" );
                                 select.val( "" );
                                 input.data( "catcomplete" ).term = "";
-                                if (self.options.defaultMessage) {
-                                    $(input).val( self.options.defaultMessage );
+                                if (that.options.defaultMessage) {
+                                    $(input).val( that.options.defaultMessage );
                                 }
                                 return false;
                             }
-                        }
+                        }                      
                     }
                 });
-            input.addClass( "ui-widget ui-widget-content ui-corner-left" );            
+            input.addClass( "ui-widget ui-widget-content" );            
 
             input.click(function() {
-                if (self.options.defaultMessage 
-                    && $(this).val() == self.options.defaultMessage) {
+                if (that.options.defaultMessage 
+                    && $(this).val() == that.options.defaultMessage) {
                     $(this).val( "" );
                 }
             });
@@ -175,7 +181,7 @@ $.widget( "custom.catcomplete", $.ui.autocomplete, {
                     text: false
                 })
                 .removeClass( "ui-corner-all" )
-                .addClass( "ui-corner-right ui-button-icon" )
+                .addClass( "ui-button-icon" )
                 .click(function() {
                     // close if already visible
                     if ( input.catcomplete( "widget" ).is( ":visible" ) ) {
